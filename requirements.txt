@@ -1,0 +1,7 @@
+flask
+psycopg2-binary
+Flask-SQLAlchemy
+tensorflow
+numpy
+matplotlib
+opencv-python
