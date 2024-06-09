@@ -4,6 +4,6 @@ Flask-SQLAlchemy
 tensorflow
 numpy
 matplotlib
-opencv-python
+opencv-python-headless
 python-dotenv
 requests
