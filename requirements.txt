@@ -6,5 +6,4 @@ numpy
 matplotlib
 opencv-python
 python-dotenv
-hashlib
-zipfile
+requests

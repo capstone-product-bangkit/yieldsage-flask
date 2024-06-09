@@ -6,8 +6,6 @@ from PIL import Image
 import requests
 from io import BytesIO
 import os
-import hashlib
-import zipfile
 import base64
 from flask import Flask, request, jsonify, make_response, send_file
 from flask_sqlalchemy import SQLAlchemy
