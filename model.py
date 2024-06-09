@@ -1,13 +1,4 @@
-import tensorflow as tf
-import numpy as np
-import matplotlib.pyplot as plt
-import cv2
-from PIL import Image
-import requests
-from io import BytesIO
-import os
-import hashlib
-import zipfile
+from requirements import tf, np, cv2, base64, BytesIO, hashlib, requests
 
 
 class Model:
@@ -72,9 +63,11 @@ class Prediction:
         for x1, y1, x2, y2 in valid_bboxes[:, :4].astype(int):
             output_image = cv2.rectangle(output_image, (x1, y1), (x2, y2), color=(0, 0, 255), thickness=2)
 
-        cv2.imwrite(self.output_path, output_image)
+        # cv2.imwrite(self.output_path, output_image)
+        _, buffer = cv2.imencode('.jpg', output_image)
+        base64_image = base64.b64encode(buffer).decode('utf-8')
 
-        return (valid_bboxes.tolist(), cpas.tolist(), masks.tolist(), global_mask.tolist())
+        return (valid_bboxes.tolist(), cpas.tolist(), masks.tolist(), global_mask.tolist(), base64_image)
 
     def __sigmoid(self, array : np.ndarray) -> np.ndarray:
         return 1 / (1 + np.exp(array)) 
@@ -157,20 +150,23 @@ class Prediction:
 def predictProjectImage(imageUrls, yieldSageModel):
     predictionResults = []
     image_path = []
+    base64_images = []
+    print("Predicting images")
     for url in imageUrls:
-        image_folder = 'images'
         response = requests.get(url)
         if response.status_code == 200:
             image =  BytesIO(response.content).read()
             randomFileName = hashlib.md5(image).hexdigest()
             fileName = 'images/output_' + randomFileName + ".jpg"  # Extracting file name from URL
-            predictionResults.append(yieldSageModel.predict(image, fileName).result[1])
+            predictions = yieldSageModel.predict(image, fileName)
+            predictionResults.append(predictions.result[1])
+            base64_image = predictions.result[4]
             image_path.append(fileName)
-            print(image_path)
+            base64_images.append(base64_image)
         else:
             print(f"Failed to download image from {url}")
             predictionResults.append(None)
-    return predictionResults, image_path
+    return predictionResults, image_path, base64_images
 
 
     

@@ -2,3 +2,4 @@ docker-compose.yml
 __pycache__
 env1
 images
+.env
