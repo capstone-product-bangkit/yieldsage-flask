@@ -5,7 +5,10 @@ import logging
 import warnings
 from rasterio.errors import NotGeoreferencedWarning
 import matplotlib.pyplot as plt
-  
+from rasterio.io import MemoryFile
+from requirements import tf, np, cv2, base64, BytesIO, hashlib, requests
+
+
 def classify_health_status(average_ndvi):
     if average_ndvi < 0.2:
         return "Poor"
@@ -16,47 +19,21 @@ def classify_health_status(average_ndvi):
     else:
         return "Excellent"
 
-def main():
-    # Define the paths for the output directory
-    ndvi_dir = 'Corn Multispectral/Multispectral-images/NDVI'
-
-    # Create the NDVI directory if it doesn't exist
-    os.makedirs(ndvi_dir, exist_ok=True)
-
-    # Set up logging
-    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
-    # Define the input paths for RED and NIR images
-    red_path = 'path/to/red.tif'
-    nir_path = 'path/to/nir.tif'
-
-    # Ensure the RED and NIR files exist
-    if not os.path.exists(red_path):
-        logging.error(f"Red file does not exist: {red_path}")
-        raise FileNotFoundError(f"Red file does not exist: {red_path}")
-    if not os.path.exists(nir_path):
-        logging.error(f"NIR file does not exist: {nir_path}")
-        raise FileNotFoundError(f"NIR file does not exist: {nir_path}")
-
-    # Construct the output NDVI file path
-    red_filename = os.path.basename(red_path)
-    ndvi_filename = red_filename.replace('RED', 'NDVI')
-    ndvi_path = os.path.join(ndvi_dir, ndvi_filename)
+def calculate_ndvi(nir_image, red_image):
 
     try:
-        # Ignore the NotGeoreferencedWarning
         with warnings.catch_warnings():
             warnings.simplefilter("ignore", NotGeoreferencedWarning)
 
-            # Load the Red band
-            with rasterio.open(red_path) as red_src:
-                red_band = red_src.read(1).astype(float)
-                red_meta = red_src.meta
+            with MemoryFile(red_image) as red_memfile:
+                with red_memfile.open() as red_src:
+                    red_band = red_src.read(1).astype(float)
+                    red_meta = red_src.meta
 
-            # Load the NIR band
-            with rasterio.open(nir_path) as nir_src:
-                nir_band = nir_src.read(1).astype(float)
-                nir_meta = nir_src.meta
+            with MemoryFile(nir_image) as nir_memfile:
+                with nir_memfile.open() as nir_src:
+                    nir_band = nir_src.read(1).astype(float)
+                    nir_meta = nir_src.meta
 
         # Calculate NDVI
         ndvi = np.where(
@@ -67,7 +44,7 @@ def main():
 
         # Calculate the average NDVI
         average_ndvi = np.mean(ndvi[(nir_band + red_band) != 0])
-        print(f"Average NDVI for {red_path} and {nir_path}: {average_ndvi}")
+        print(f"Average NDVI: {average_ndvi}")
 
         # Determine health status
         health_status = classify_health_status(average_ndvi)
@@ -77,21 +54,48 @@ def main():
         ndvi_meta = red_meta
         ndvi_meta.update(dtype=rasterio.float32, count=1)
 
-        # Write the NDVI band to the output file
-        with rasterio.open(ndvi_path, 'w', **ndvi_meta) as dst:
-            dst.write(ndvi.astype(rasterio.float32), 1)
 
-        logging.info(f"Successfully processed NDVI for {red_path}")
+        ndvi_base64 = ""
+        with MemoryFile() as memfile:
+            with memfile.open(**ndvi_meta) as dst:
+                dst.write(ndvi.astype(rasterio.float32), 1)
 
+            # Read the image back from memory file and encode as Base64
+            with memfile.open() as src:
+                ndvi_image = src.read(1)
+                buffer = BytesIO()
+                np.save(buffer, ndvi_image)
+                buffer.seek(0)  # Ensure the buffer's position is at the start
+                ndvi_base64 = base64.b64encode(buffer.getvalue()).decode('utf-8')
         # Plot the NDVI image
-        plt.figure(figsize=(10, 6))
-        plt.title(f"NDVI Image for {red_path} and {nir_path} - Health status: {health_status}")
-        plt.imshow(ndvi, cmap='RdYlGn')
-        plt.colorbar(label='NDVI value')
-        plt.show()
+        return health_status, average_ndvi, ndvi_base64
 
     except Exception as e:
-        logging.error(f"Failed to process {red_path} and {nir_path}: {e}")
+        logging.error(f"Failed to process red and nir image {e}")
 
-if __name__ == "__main__":
-    main()
+def calculateNDVI():
+    image_files = []
+    image_urls = [
+        'https://firebasestorage.googleapis.com/v0/b/capstone-project-yielsage.appspot.com/o/images%2FIMG_210204_100638_0349_NIR.tif?alt=media&token=0b211a20-c0ce-45a4-8915-ce9a3d1d0101',
+        'https://firebasestorage.googleapis.com/v0/b/capstone-project-yielsage.appspot.com/o/images%2FIMG_210204_100638_0349_RED.tif?alt=media&token=185fef26-90da-49ec-8995-5ae0311548ba'
+    ]
+
+    for url in image_urls:
+        response = requests.get(url)
+        if response.status_code == 200:
+            image = BytesIO(response.content).read()
+            image_files.append(image)
+
+    if len(image_files) == 2:
+        result = calculate_ndvi(image_files[0], image_files[1])
+        if result is not None:
+            health_status, average_ndvi, ndvi_base64 = result
+            print(health_status, average_ndvi, ndvi_base64)
+        else:
+            logging.error("Failed to calculate NDVI.")
+    else:
+        logging.error("Failed to download images or incorrect number of images.")
+
+
+# if __name__ == '__main__':
+#     calculateNDVI()
