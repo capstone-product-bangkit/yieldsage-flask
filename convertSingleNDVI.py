@@ -5,7 +5,7 @@ import logging
 import warnings
 from rasterio.errors import NotGeoreferencedWarning
 import matplotlib.pyplot as plt
-
+  
 def classify_health_status(average_ndvi):
     if average_ndvi < 0.2:
         return "Poor"
