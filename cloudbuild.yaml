@@ -1,0 +1,21 @@
+steps:
+  # Step 1: Build the Docker image
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "build",
+        "-t",
+        "asia-southeast2-docker.pkg.dev/capstone-project-yielsage/yieldsage-repo/flask-web-server",
+        ".",
+      ]
+
+  # Step 2: Push the Docker image to Artifact Registry
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "push",
+        "asia-southeast2-docker.pkg.dev/capstone-project-yielsage/yieldsage-repo/flask-web-server",
+      ]
+
+images:
+  - "asia-southeast2-docker.pkg.dev/capstone-project-yielsage/yieldsage-repo/flask-web-server"
